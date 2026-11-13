@@ -1,0 +1,77 @@
+{
+  "name": "dsh-voxel-forge",
+  "version": "0.1.0",
+  "description": "体素切片工坊：上传 GLB/GLTF 真切片成逐层可拼的 LEGO 体素模型（面积加权取色+三维洪泛保空腔），或体素风参考图程序化生成；装配真实零件、可拼搭硬检查、LDraw 导出；面板上传入口 + 三视图验收 + 3D 对照。",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/host.js",
+  "exports": {
+    ".": "./src/host.js",
+    "./client": "./dist/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "icon": "./icon.svg",
+  "files": [
+    "src",
+    "dist",
+    "lib",
+    "engine",
+    "viewer",
+    "templates",
+    "examples",
+    "skills",
+    "locale/*.json",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "voxel",
+    "lego",
+    "3d",
+    "glb",
+    "slicing"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.19.0",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "test": "node --test \"test/*.test.mjs\"",
+    "smoke": "node scripts/smoke.mjs",
+    "live": "node scripts/live.mjs",
+    "dev": "node scripts/devserver.mjs 5187",
+    "prepare": "npm run build",
+    "prepack": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liangdabiao/dsh-voxel-forge.git"
+  }
+}

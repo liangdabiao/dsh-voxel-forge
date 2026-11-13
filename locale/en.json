@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Voxel forge",
+    "description": "Slice an uploaded GLB/GLTF into buildable layer-by-layer LEGO voxels (flood-fill cavities, area-weighted texture colours), or generate procedurally from voxel-art references; panel upload, three-view validation, 3D voxel/brick compare, LDraw export."
+  }
+}
