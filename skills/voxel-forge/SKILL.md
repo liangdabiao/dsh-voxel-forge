@@ -11,7 +11,8 @@ description: 体素切片方法论：把 3D 模型（GLB/GLTF）真切片成逐�
 两条路线，按手上有什么选：
 
 - **有模型文件**（用户面板上传，或给本机路径 → `action="upload"`）→ 切片路线。写实照片取色 / 凭渲染图想象形状这两条路**都被否决过**（形状失真 + 颜色全错），不要走。
-- **只有体素风/像素风参考图**（块面清楚、色块分明）→ 程序化路线：`action="scene"` 写场景 + `action="gen"` 生成。图里的块面就是格子决策，照块面写基本形最准。
+- **只有体素风/像素风参考图**（块面清楚、色块分明）→ 程序化路线：面板上传图片（或 `action="upload", path=<图片绝对路径>`）会存成 `ref/ref.<ext>`，然后 `action="read", what="ref"` 拿路径 → **`read_image` 亲眼看图** → `action="scene"` 写场景 → `action="gen"` 生成。图里的块面就是格子决策，照块面写基本形最准。
+- 上传入口按扩展名自动分流：`.glb/.gltf` 走切片，`.jpg/.jpeg/.png/.webp` 走参考图；写实照片先跟用户对齐预期（取色会形状失真 + 颜色全错）。
 
 ## 铁律（违反必然返工）
 
@@ -26,8 +27,9 @@ description: 体素切片方法论：把 3D 模型（GLB/GLTF）真切片成逐�
 
 ### 1. 拿到模型
 
-- 用户面板上传（上传即 64 层快速切片出验收图）或 `voxel_forge(action="upload", name=模型名, path=本机GLB绝对路径)`
+- 用户面板上传（GLB 上传即 64 层快速切片出验收图；图片上传则存为参考图）或 `voxel_forge(action="upload", name=模型名, path=本机GLB或图片绝对路径)`
 - 模型格式 `.glb`/`.gltf`（需要顶点/法线/UV/baseColorTexture 四件套；WebP 贴图不支持，先转 PNG）
+- 图片格式 `.jpg`/`.jpeg`/`.png`/`.webp`：导入后必须先 `action="read", what="ref"` 拿绝对路径并 `read_image` 看图，再决定体素风与否
 
 ### 2. 切片
 
@@ -66,6 +68,8 @@ description: 体素切片方法论：把 3D 模型（GLB/GLTF）真切片成逐�
 ### 6. 程序化路线（参考图本身是体素风时）
 
 `action="scene"` 存场景（JS 模块 `export function build(v)`）→ `action="gen"` 生成 → 同样验收/装配。
+
+进这条路之前必须先看图：`action="read", what="ref"` 拿参考图绝对路径 → `read_image` 亲眼看。判断标准是块面是否清楚（哪里 1 格、哪里 3 格）；写实照片不要硬做，先跟用户对齐"换 GLB 模型"或"我按大致块面抽象一版，件数会很多"。
 
 | 形体 | 方法 |
 |---|---|

@@ -8,7 +8,7 @@ import Schema from '@deepseek-ai/schemastery'
 import {
   sliceModel, genModel, saveScene, buildModel, previewModel, probeModel,
   downscaleModel, modelDetail, readOut, listModels, deleteModel,
-  uploadModel, makeBall,
+  uploadModel, uploadRefImage, refFile, makeBall,
 } from '../lib/ops.js'
 import { modelDir } from '../lib/store.js'
 import { writeJsonAtomic } from '../lib/util.js'
@@ -70,18 +70,18 @@ export const voxelForgeTool = {
   name: 'voxel_forge',
   description:
     '把 3D 模型（GLB/GLTF，用户在面板上传，或给出本机绝对路径）真切片成逐层可拼的 LEGO 体素模型（一格一砖、洪泛保空腔、贴图面积加权取色），' +
-    '或对体素风/像素风参考图用 scene.mjs 基本形程序化生成；再装配成 set.html 3D / model.ldr / parts.csv 交付物。' +
-    '用户想「把模型拼成积木/切片成体素/乐高化/逐层积木」时使用。' +
-    '工作目录 $DSH_HOME/voxel-forge/<模型名>/。验收纪律：切片后必须让用户看面板三视图（或 probe ASCII）再装配；' +
-    '几何/颜色问题分开修，一次只改一个假设。',
+    '也能吃普通图片：上传体素风/像素风参考图后 agent 用 read_image 看图、写场景文件程序化生成；再装配成 set.html 3D / model.ldr / parts.csv 交付物。' +
+    '用户想「把模型拼成积木/切片成体素/乐高化/逐层积木」或「按这张图做积木」时使用。' +
+    '工作目录 $DSH_HOME/voxel-forge/<模型名>/。路线判定：GLB → slice；图片 → 先 read_image 判定是不是体素风，是则 scene+gen，写实照片先跟用户对齐预期。' +
+    '验收纪律：切片后必须让用户看面板三视图（或 probe ASCII）再装配；几何/颜色问题分开修，一次只改一个假设。',
   parameters: {
     type: 'object',
     additionalProperties: false,
     required: ['action'],
     properties: {
-      action: str('slice 切片 GLB；scene 保存程序化场景；gen 跑场景生成体素；build 装配出交付物；preview 重出验收图；probe 体检（颜色分布/ASCII/剖面）；downscale 缩放；ball 验证球；read 读产物；list 列模型；delete 删模型；upload 从本机路径导入 GLB', { enum: ['slice', 'scene', 'gen', 'build', 'preview', 'probe', 'downscale', 'ball', 'read', 'list', 'delete', 'upload'] }),
+      action: str('slice 切片 GLB；scene 保存程序化场景；gen 跑场景生成体素；build 装配出交付物；preview 重出验收图；probe 体检（颜色分布/ASCII/剖面）；downscale 缩放；ball 验证球；read 读产物（含 ref 参考图路径）；list 列模型；delete 删模型；upload 从本机路径导入 GLB 或参考图（按扩展名自动分流）', { enum: ['slice', 'scene', 'gen', 'build', 'preview', 'probe', 'downscale', 'ball', 'read', 'list', 'delete', 'upload'] }),
       name: str('模型名（可中文）'),
-      path: str('upload 必填：GLB 文件本机绝对路径'),
+      path: str('upload 必填：GLB 或参考图（jpg/png/webp）的本机绝对路径'),
       code: str('scene 必填：场景文件内容（JS 模块，export function build(v)，用 v.put/box/ellipsoid/revolve/tube/repaint 逐格写）'),
       courses: num(`slice 可选：砖层数（默认 96；${COURSES_HINT}）`),
       merge: str('slice 可选：颜色归并表 default=内置材质表 / none=关闭（看原始贴图）'),
@@ -95,7 +95,7 @@ export const voxelForgeTool = {
       layers: str('probe 可选：层范围 b0:b1（配 cols 出正面 ASCII）'),
       cols: str('probe 可选：列范围 a0:a1'),
       profile: str('probe 可选：列,层 —— 打印该格从远到近的颜色剖面'),
-      what: str('read 必填：report 检查报告 / ldr LDraw / csv BOM / check 结构化检查 / scene 场景文件 / versions 版本历史 / meta 模型详情', { enum: ['report', 'ldr', 'csv', 'check', 'scene', 'versions', 'meta'] }),
+      what: str('read 必填：report 检查报告 / ldr LDraw / csv BOM / check 结构化检查 / scene 场景文件 / versions 版本历史 / meta 模型详情 / ref 参考图路径', { enum: ['report', 'ldr', 'csv', 'check', 'scene', 'versions', 'meta', 'ref'] }),
       title: str('upload/scene 可选：展示标题'),
     },
   },
@@ -119,6 +119,15 @@ export const voxelForgeTool = {
         const { readFileSync } = await import('node:fs')
         const buf = readFileSync(args.path)
         const filename = args.path.split(/[\\/]/).pop()
+        if (/\.(jpe?g|png|webp)$/i.test(filename)) {
+          const r = uploadRefImage(cfg, name, filename, buf, { title: args.title })
+          const size = buf.length >= 1024 ? `${(buf.length / 1024).toFixed(0)} KB` : `${buf.length} B`
+          return result(true, `参考图已导入为模型「${r.name}」（${size}）。` +
+            `下一步必须先用 read_image 看这张图：${r.refPath} —— 判断它是不是体素风/像素风（块面清楚、色块分明）。` +
+            `是 → 按图写场景文件存进 action="scene"（name="${r.name}"），再 action="gen" 出体素、看验收图；` +
+            `若只是写实照片，先跟用户对齐预期（照片取色会形状失真+颜色全错，实测被否决），别硬做。`,
+          `参考图路径：${r.refPath}\n模型目录：${r.dir}`)
+        }
         const r = uploadModel(cfg, name, filename, buf, { title: args.title })
         return result(true, `已导入 ${filename}（${(r.bytes / 1024).toFixed(0)} KB）为模型「${r.name}」。下一步：voxel_forge(action="slice", name="${r.name}")，${COURSES_HINT}。`)
       }
@@ -169,6 +178,11 @@ export const voxelForgeTool = {
       }
 
       if (args.action === 'read') {
+        if (args.what === 'ref') {
+          const file = refFile(cfg, name)
+          if (!file) return result(false, `模型「${name}」没有参考图（面板上传图片，或 action="upload", path=<图片绝对路径>）`)
+          return result(true, `「${name}」参考图路径（用 read_image 看图，再决定按图写场景还是提醒用户换 GLB）`, file)
+        }
         if (args.what === 'versions') {
           const detail = modelDetail(cfg, name)
           if (!detail) return result(false, `模型不存在：${name}`)

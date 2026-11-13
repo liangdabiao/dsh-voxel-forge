@@ -64,7 +64,7 @@
         <div class="card model-card">
           <div class="head">
             <span class="title">${esc(m.title)}</span>
-            <span class="tag ${m.source === 'glb' ? '' : 'gray'}">${m.source === 'glb' ? 'GLB 切片' : m.source === 'scene' ? '程序化' : '空'}</span>
+            <span class="tag ${m.source === 'glb' ? '' : 'gray'}">${m.source === 'glb' ? 'GLB 切片' : m.source === 'image' ? '图片参考' : m.source === 'scene' ? '程序化' : '空'}</span>
           </div>
           <div class="stats">
             ${m.has_volume ? `<span><b>${m.cells}</b> 格</span><span><b>${m.courses}</b> 层</span>` : '<span>未切片</span>'}
@@ -75,16 +75,16 @@
             <button class="danger small" data-del="${esc(m.name)}">删除</button>
           </div>
         </div>`).join('') + '</div>'
-      : '<div class="empty">还没有模型——上传一个 GLB 开始，或在对话里让 agent 用 voxel_forge 的 action=upload / scene。</div>'
+      : '<div class="empty">还没有模型——上传一个 GLB（真切片），或上传一张体素风/像素风参考图（agent 看图写场景），也可以在对话里让 agent 用 voxel_forge 的 action=upload / scene。</div>'
 
     $app.innerHTML = `
-      <h1>上传 3D 文件</h1>
-      <p class="lead">GLB / GLTF（≤ ${catalog.maxUploadMb} MB）。上传后 agent 用 voxel_forge 真切片：一格一砖、三维洪泛保空腔、贴图面积加权取色，装配出可拼搭检查报告与 LDraw。</p>
+      <h1>上传文件</h1>
+      <p class="lead">两条路线：<b>GLB / GLTF</b>（≤ ${catalog.maxUploadMb} MB）→ agent 真切片，一格一砖、洪泛保空腔、贴图面积加权取色；<b>普通图片</b>（.jpg / .png / .webp）→ 存为参考图，agent 先看图判断体素风，再写场景程序化生成积木。</p>
       <div class="dropzone" id="dropzone">
         <div class="big">🧱</div>
-        <div><b>点击选择或拖入 .glb / .gltf 文件</b></div>
-        <p>模型名默认取文件名；切片参数可在模型页调整（courses 建议：人像 128 / 小物件 64~96）</p>
-        <input type="file" id="fileinput" accept=".glb,.gltf">
+        <div><b>点击选择或拖入 .glb / .gltf，或 .jpg / .png / .webp 参考图</b></div>
+        <p>3D 文件默认取文件名建模型；图片会用 agent 视觉读图（体素风最准，写实照片会先跟你对齐预期）</p>
+        <input type="file" id="fileinput" accept=".glb,.gltf,.jpg,.jpeg,.png,.webp">
       </div>
       <h2>模型库（${catalog.models.length}）</h2>
       ${modelsHtml}
@@ -115,7 +115,9 @@
     })
 
     async function uploadFile(file) {
-      if (!/\.(glb|gltf)$/i.test(file.name)) return toast('只支持 .glb / .gltf', true)
+      const isImage = /\.(jpe?g|png|webp)$/i.test(file.name)
+      const isGlb = /\.(glb|gltf)$/i.test(file.name)
+      if (!isImage && !isGlb) return toast('只支持 .glb / .gltf，或 .jpg / .jpeg / .png / .webp 参考图', true)
       if (file.size > (catalog.maxUploadMb || 80) * 1024 * 1024) return toast(`超过 ${catalog.maxUploadMb} MB 上限`, true)
       toast(`上传中：${file.name}（${(file.size / 1024).toFixed(0)} KB）…`)
       const base64 = await new Promise((resolve, reject) => {
@@ -124,10 +126,12 @@
         r.onerror = reject
         r.readAsDataURL(file)
       })
-      const name = file.name.replace(/\.(glb|gltf)$/i, '')
+      const name = file.name.replace(/\.(glb|gltf|jpe?g|png|webp)$/i, '')
       try {
         const r = await apiPost('/api/models/upload', { name, filename: file.name, base64 })
-        toast(`已上传：${r.name}。切片建议找 agent，或点「打开」调参数`)
+        toast(r.kind === 'image'
+          ? `参考图已存入「${r.name}」。点「打开」→「按参考图生成」，或在对话里说「按这张图生成积木模型」`
+          : `已上传：${r.name}。切片建议找 agent，或点「打开」调参数`)
         location.hash = `#/m/${encodeURIComponent(r.name)}`
       } catch (e) { toast(e.message, true) }
     }
@@ -146,19 +150,40 @@
       <div class="gal">
         ${['front', 'back', 'side'].map((k) => `<figure><img src="/voxel-forge/api/models/${encodeURIComponent(name)}/file?p=previews/view_${k}.png" data-zoom><figcaption>${{ front: '正视图', back: '背视图', side: '侧视图' }[k]}</figcaption></figure>`).join('')}
         <figure><img src="/voxel-forge/api/models/${encodeURIComponent(name)}/file?p=previews/layers.png" data-zoom><figcaption>分层图</figcaption></figure>
-      </div>` : '<h2>验收图</h2><div class="empty">还没切片——下方调参数后点「开始切片」</div>'
+      </div>`
+      : d.has_ref && !d.has_glb
+        ? `<h2>验收图</h2><div class="empty">还没有体素——点上方「按参考图生成积木」，agent 看图写场景后会生成验收图</div>`
+        : '<h2>验收图</h2><div class="empty">还没切片——下方调参数后点「开始切片」</div>'
 
     const colorsHtml = vol ? `
       <h2>颜色分布（${vol.colors.length} 色）</h2>
       <div class="card">${vol.colors.slice(0, 12).map(([c, n]) => `<span class="tag gray" style="margin:2px">${esc(c)} × ${n}</span>`).join(' ')}</div>` : ''
 
+    const refHtml = d.has_ref ? `
+      <h2>参考图</h2>
+      <div class="card">
+        <div class="row" style="align-items:flex-start;gap:16px">
+          <figure style="margin:0;max-width:min(100%,420px)">
+            <img src="/voxel-forge/api/models/${encodeURIComponent(name)}/file?p=${encodeURIComponent(d.ref.rel)}"
+                 alt="参考图" data-zoom style="width:100%;border-radius:8px;border:1px solid var(--line);cursor:zoom-in">
+            <figcaption class="muted" style="font-size:12px;margin-top:6px">${esc(d.ref.source_file || d.ref.rel)}（${d.ref.bytes ? (d.ref.bytes / 1024).toFixed(0) + ' KB' : '—'}）</figcaption>
+          </figure>
+          <div style="flex:1;min-width:220px">
+            <p class="lead" style="margin:0 0 10px">图片路线：agent 先用视觉读这张图，判断是不是体素风/像素风（块面清楚、色块分明）。是 → 照块面写场景文件再生成体素；写实照片会先跟你对齐预期。</p>
+            <button id="btn-from-ref" class="ghost">按参考图生成积木</button>
+          </div>
+        </div>
+      </div>` : ''
+
     $app.innerHTML = `
       <a href="#/" class="muted" style="font-size:12px">← 模型库</a>
       <h1>${esc(d.meta?.title || name)}</h1>
-      <p class="lead">来源：${d.has_glb ? 'GLB 文件' : d.has_scene ? '程序化场景' : '空'} ·
+      <p class="lead">来源：${d.has_glb ? 'GLB 文件' : d.has_ref ? '参考图片' : d.has_scene ? '程序化场景' : '空'} ·
         ${vol ? `<b>${vol.cells}</b> 格 / <b>${vol.nx}×${vol.ny}×${vol.nz}</b>（${vol.ny} 层）` : '未切片'} ·
         ${d.versions.length ? `装配 <b>v${d.versions[0].v}</b>（${d.versions[0].ok ? 'PASS' : 'FAIL'}，${d.versions[0].parts} 件）` : '未装配'}
       </p>
+
+      ${refHtml}
 
       <div class="card">
         <div class="row" style="align-items:end">
@@ -256,6 +281,13 @@
     document.getElementById('in-ver')?.addEventListener('change', (e) => renderModel(name, Number(e.target.value), voxMode))
     document.getElementById('btn-chat')?.addEventListener('click', () => {
       const prompt = `处理体素模型「${name}」：用 voxel_forge 检查当前状态，切片/生成的验收问题（朝向、比例、空腔、颜色分区）先看 probe 与验收图再改；需要装配交付就 build 并汇报检查报告结论。`
+      try { parent.postMessage({ type: 'voxel-forge:refresh', prompt }, location.origin) } catch {}
+      toast('已发送到对话（若侧栏无反应请在对话里直接 @）')
+    })
+    document.getElementById('btn-from-ref')?.addEventListener('click', () => {
+      const prompt = `按参考图生成积木模型「${name}」：先用 voxel_forge(action="read", name="${name}", what="ref") 拿参考图路径，用 read_image 看这张图，判断它是不是体素风/像素风（块面清楚、色块分明）。` +
+        `是 → 照块面写场景文件（action="scene", name="${name}", code=<JS 模块，export function build(v)，用 v.put/box/ellipsoid/revolve/tube/repaint>），再 action="gen" 出体素、给我看验收图；` +
+        `若是写实照片 → 先跟我对齐预期，说明照片取色会形状失真、颜色全错，建议换 GLB 模型。`
       try { parent.postMessage({ type: 'voxel-forge:refresh', prompt }, location.origin) } catch {}
       toast('已发送到对话（若侧栏无反应请在对话里直接 @）')
     })

@@ -10,10 +10,11 @@ DeepSeek Harness（[dsh](https://www.npmjs.com/package/@deepseek-ai/dsh)）插�
 
 | 能力 | 说明 |
 |---|---|
-| **面板上传 3D 文件入口** | 拖拽/点选 `.glb`/`.gltf`（≤80 MB）→ 上传即 64 层快速切片，立刻出验收图 |
-| `voxel_forge` 工具（12 个 action） | `upload` 本机导入 · `slice` 切片（courses/merge/absorb/denoise/darkdetail）· `scene`+`gen` 程序化生成 · `build` 装配 · `preview` 验收图 · `probe` 体检（颜色分布/正面 ASCII/深度剖面）· `downscale` 缩放 · `ball` 验证球 · `read`/`list`/`delete` |
+| **面板上传入口（GLB + 图片）** | 拖拽/点选 `.glb`/`.gltf`（≤80 MB）→ 上传即 64 层快速切片，立刻出验收图；`.jpg`/`.jpeg`/`.png`/`.webp` → 存为参考图，agent 用视觉读图后程序化生成 |
+| `voxel_forge` 工具（12 个 action） | `upload` 本机导入 GLB 或参考图（按扩展名分流）· `slice` 切片（courses/merge/absorb/denoise/darkdetail）· `scene`+`gen` 程序化生成 · `build` 装配 · `preview` 验收图 · `probe` 体检（颜色分布/正面 ASCII/深度剖面）· `downscale` 缩放 · `ball` 验证球 · `read`（含 `what="ref"` 取参考图路径）/`list`/`delete` |
+| **图片路线** | 上传图片即建模型并落盘 `ref/ref.<ext>`；agent `read_image` 看图判断是否体素风 → 写场景 → `gen` 出体素；写实照片会先跟用户对齐预期 |
 | **切片管线**（vox.py 全量移植） | 7 点采样 + 面积加权投票 → 暗细节保底（闭眼/刻线）→ 三维洪泛判内外（保悬垂空腔）→ 反填 carve → 表面取色 → 材质归并/孤立色吸收 → 内部 BFS 传色 → 去噪 |
-| 侧栏「体素切片工坊」面板 | 上传入口 + 模型库 / 切片参数表单 / 三视图+分层图（灯箱放大）/ 3D（砖块 ↔ 体素对照，框选批注继承自 forge viewer）/ 颜色分布 / 检查报告 / BOM+LDraw 下载 / 时间线 |
+| 侧栏「体素切片工坊」面板 | 上传入口 + 模型库（GLB 切片 / 图片参考标签）/ 参考图展示与「按参考图生成」/ 切片参数表单 / 三视图+分层图（灯箱放大）/ 3D（砖块 ↔ 体素对照，框选批注继承自 forge viewer）/ 颜色分布 / 检查报告 / BOM+LDraw 下载 / 时间线 |
 | 交付物 | set.html（独立 3D 页）、model.ldr、parts.csv、report.txt、check.json、验收图 PNG |
 
 ## 两条路线
@@ -21,8 +22,8 @@ DeepSeek Harness（[dsh](https://www.npmjs.com/package/@deepseek-ai/dsh)）插�
 | 手上有什么 | 走哪条 |
 |---|---|
 | `.glb`/`.gltf`（扫描件/雕刻/游戏资产，带贴图） | **切片**：形体忠实度最高，颜色来自模型贴图 |
-| 体素风/像素风参考图（块面清楚） | **程序化**：`action="scene"` 写基本形场景（ellipsoid/revolve/tube/repaint/hash01 确定性杂色） |
-| 写实照片 | 都不成立——先对齐预期，不要硬做 |
+| 体素风/像素风参考图（块面清楚） | **程序化**：面板上传图片（或 `action="upload", path=<图片路径>`）→ agent `read_image` 看图 → `action="scene"` 写基本形场景（ellipsoid/revolve/tube/repaint/hash01 确定性杂色）→ `gen` |
+| 写实照片 | 都不成立——先对齐预期，不要硬做（取色会形状失真 + 颜色全错，实测被否决） |
 
 ## 使用
 
@@ -30,7 +31,8 @@ DeepSeek Harness（[dsh](https://www.npmjs.com/package/@deepseek-ai/dsh)）插�
 
 - 「我刚在面板传了个鹿模型，切成积木」——agent 走 `slice courses=128` → 看验收图 → `probe` 排查 → `build` → 汇报检查报告
 - 「小一半」——`downscale`（归并而非重切；1 格宽细结构会变粗或断开，agent 会主动说明）
-- 「参考这张像素图画个浮岛」——`scene` 写场景 → `gen` → `build`
+- 「参考这张像素图画个浮岛」——先传图（面板拖入图片，或给本机路径），agent `read_image` 看图 → `scene` 写场景 → `gen` → `build`
+- 「按这张图做个积木」——同上；写实照片 agent 会先跟你确认（照片取色形状会失真）
 
 或打开侧栏「体素切片工坊」：拖一个 GLB 进上传区，看三视图确认朝向/比例/空腔，点装配下载 LDraw 和 BOM。
 
