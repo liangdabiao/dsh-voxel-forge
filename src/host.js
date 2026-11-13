@@ -110,7 +110,8 @@ export const voxelForgeTool = {
         const models = listModels(cfg)
         if (!models.length) return result(true, `还没有模型。上传入口：侧栏「体素切片工坊」面板 →「上传 3D 文件」（.glb/.gltf）；或 voxel_forge(action="upload", path=<本机GLB绝对路径>)。`)
         return result(true, `共 ${models.length} 个模型（新→旧）`, models.map((m) => {
-          const bits = [`${m.name}｜${m.source === 'glb' ? 'GLB切片' : m.source === 'scene' ? '程序化' : '空'}｜${m.has_volume ? `${m.cells} 格 / ${m.courses} 层` : '未切片'}`, m.versions ? `v${m.versions}` : '']
+          const kind = m.source === 'glb' ? 'GLB切片' : m.source === 'scene' ? '程序化' : m.source === 'image' ? (m.has_volume ? '图片参考→已生成' : '图片参考') : '空'
+          const bits = [`${m.name}｜${kind}｜${m.has_volume ? `${m.cells} 格 / ${m.courses} 层` : '未切片'}`, m.versions ? `v${m.versions}` : '']
           return bits.filter(Boolean).join('｜')
         }).join('\n'))
       }
