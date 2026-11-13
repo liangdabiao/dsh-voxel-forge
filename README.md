@@ -4,6 +4,8 @@ DeepSeek Harness（[dsh](https://www.npmjs.com/package/@deepseek-ai/dsh)）插�
 
 引擎、零件几何与装配检查源自 [lego-forge](https://github.com/ericfu-tianchi/lego-forge)（MIT，与 [dsh-lego-forge](https://github.com/liangdabiao/dsh-lego-forge) 同源）；切片方法论源自 [lego-3d-voxel](https://github.com/liangdabiao/lego-3d-voxel)（Python → **Node 全量重写，零 Python 依赖**，numpy 向量化 → TypedArray + BFS）；LDraw 零件几何 © LDraw.org (CC BY 2.0)。
 
+<img width="2379" height="1386" alt="image" src="https://github.com/user-attachments/assets/22b59991-e628-44a9-a9fd-1c91f9d32571" />
+
 ## 装上以后有什么
 
 | 能力 | 说明 |
