@@ -6,6 +6,12 @@ DeepSeek Harness（[dsh](https://www.npmjs.com/package/@deepseek-ai/dsh)）插�
 
 <img width="2379" height="1386" alt="image" src="https://github.com/user-attachments/assets/22b59991-e628-44a9-a9fd-1c91f9d32571" />
 
+## 安装
+
+```bash
+dsh plugin --profile web add https://github.com/liangdabiao/dsh-voxel-forge
+```
+
 ## 装上以后有什么
 
 | 能力 | 说明 |
